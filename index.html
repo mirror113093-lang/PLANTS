@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data:; base-uri 'none'; form-action 'none'">
+<meta name="referrer" content="no-referrer">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="観葉植物">
+<meta name="theme-color" content="#3f8f62">
+<link rel="icon" href="data:,">
+<title>観葉植物ノート</title>
+<style>
+:root{--bg:#f4f7f4;--card:#fff;--text:#1f2a24;--sub:#6b7a70;--accent:#3f8f62;--over:#d9534f;--due:#e8a33d;--line:#e1e8e3}
+@media (prefers-color-scheme:dark){
+  :root{--bg:#121714;--card:#1b231e;--text:#e6ede8;--sub:#9aa9a0;--accent:#5fb384;--over:#ef7b77;--due:#f0b865;--line:#2a352e}
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+body{margin:0;background:var(--bg);color:var(--text);line-height:1.6;
+  font-family:system-ui,-apple-system,"Hiragino Sans","Noto Sans JP",sans-serif}
+main{max-width:520px;margin:0 auto;padding:16px 14px calc(80px + env(safe-area-inset-bottom))}
+header{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:14px}
+h1{font-size:1.2rem;margin:0}
+h2{font-size:1.05rem;margin:0}
+h3{font-size:.85rem;color:var(--sub);margin:18px 0 6px}
+button{font:inherit;border:1px solid var(--line);background:var(--card);color:var(--text);
+  border-radius:10px;padding:8px 12px;cursor:pointer}
+button.primary{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:600}
+button.danger{color:var(--over);border-color:var(--over);background:transparent}
+button.full{width:100%;margin-top:10px;padding:12px}
+.hbtns{display:flex;gap:6px}
+.plant{background:var(--card);border:1px solid var(--line);border-left:6px solid var(--accent);
+  border-radius:14px;padding:12px 14px;margin-bottom:12px}
+.plant.due{border-left-color:var(--due)}
+.plant.over{border-left-color:var(--over)}
+.head{display:flex;justify-content:space-between;align-items:baseline;gap:8px;cursor:pointer}
+.name{font-size:1.1rem;font-weight:700;word-break:break-all}
+.interval{color:var(--sub);font-size:.8rem;white-space:nowrap}
+.next{font-weight:600;margin-top:2px}
+.plant.over .next{color:var(--over)}
+.plant.due .next{color:var(--due)}
+.sub{color:var(--sub);font-size:.82rem}
+.water{width:100%;margin-top:10px;padding:13px;font-size:1rem;font-weight:700;
+  background:var(--accent);border-color:var(--accent);color:#fff;border-radius:12px}
+.note{color:var(--sub);font-size:.82rem}
+#empty{text-align:center;color:var(--sub);padding:32px 8px}
+dialog{width:min(92vw,460px);max-height:88vh;overflow:auto;border:0;border-radius:16px;
+  padding:16px;background:var(--card);color:var(--text);overscroll-behavior:contain}
+dialog::backdrop{background:rgba(0,0,0,.45)}
+.dhead{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
+label.f{display:block;font-size:.85rem;color:var(--sub);margin-top:10px}
+input,select,textarea{font:inherit;width:100%;margin-top:4px;padding:10px;border-radius:10px;
+  border:1px solid var(--line);background:var(--bg);color:var(--text)}
+.addrow{display:grid;grid-template-columns:1fr 1.2fr;gap:8px;margin-bottom:8px}
+.addrow select,.addrow input{margin-top:0}
+.logs{list-style:none;margin:0;padding:0}
+.logs li{display:grid;grid-template-columns:auto auto 1fr auto;gap:8px;align-items:center;
+  padding:8px 0;border-bottom:1px solid var(--line);font-size:.9rem}
+.logs li.none{display:block;color:var(--sub);border:0}
+.logs .d{color:var(--sub)}
+.logs .n{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--sub)}
+.logs .x{padding:2px 9px;border:0;background:transparent;color:var(--sub);font-size:1.1rem}
+.row{display:flex;gap:8px;margin-top:8px}
+.row button{flex:1}
+textarea{margin-top:8px;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:.8rem}
+#toast{position:fixed;left:50%;bottom:calc(16px + env(safe-area-inset-bottom));
+  transform:translate(-50%,160%);transition:transform .25s;z-index:10;
+  background:#27322b;color:#fff;border-radius:12px;padding:10px 14px;display:flex;gap:12px;
+  align-items:center;max-width:92vw;font-size:.9rem}
+#toast.show{transform:translate(-50%,0)}
+#toast button{background:transparent;color:#9fe0bb;border:0;padding:0;font-weight:700}
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>🌿 観葉植物</h1>
+    <div class="hbtns">
+      <button id="addBtn" class="primary">＋ 追加</button>
+      <button id="backupBtn">バックアップ</button>
+    </div>
+  </header>
+  <div id="list"></div>
+  <p id="empty" hidden>まだ植物がいません。<br>「＋ 追加」から登録してください。</p>
+</main>
+
+<div id="toast"><span id="toastMsg"></span><button id="undoBtn" hidden>取り消す</button></div>
+
+<dialog id="detail">
+  <div class="dhead"><span class="note">植物の詳細</span><button id="detailClose">閉じる</button></div>
+  <div id="detailBody"></div>
+</dialog>
+
+<dialog id="addDlg">
+  <div class="dhead"><h2>植物を追加</h2><button type="button" id="addClose">閉じる</button></div>
+  <form id="addForm">
+    <label class="f">名前<input id="aName" required maxlength="40" placeholder="例：モンステラ"></label>
+    <label class="f">水やりの間隔（日）<input id="aInt" type="number" min="1" max="365" value="7" inputmode="numeric"></label>
+    <label class="f">最後に水をあげた日（わかれば）<input id="aLast" type="date"></label>
+    <button class="primary full" type="submit">追加する</button>
+  </form>
+</dialog>
+
+<dialog id="backupDlg">
+  <div class="dhead"><h2>バックアップ</h2><button id="backupClose">閉じる</button></div>
+  <p class="note">記録はこの端末のブラウザ内にだけ保存されています。下の文字列をコピーしてメモアプリなどに保存しておけば、データが消えたときや機種変更のときに復元できます。</p>
+  <textarea id="bkText" rows="6" spellcheck="false"></textarea>
+  <div class="row">
+    <button id="bkCopy">コピー</button>
+    <button id="bkLoad" class="primary">貼り付けた内容を読み込む</button>
+  </div>
+  <p id="bkStatus" class="note"></p>
+</dialog>
+
+<script>
+(() => {
+  const KEY = 'houseplants-v1';
+  const TYPES = {
+    water: { label: '水やり', icon: '💧' },
+    soil:  { label: '土替え', icon: '🌱' },
+    pot:   { label: '鉢替え', icon: '🪴' }
+  };
+  const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+  const $ = id => document.getElementById(id);
+  const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+  const pad = n => String(n).padStart(2, '0');
+  const ymd = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  const parse = s => { const [y, m, d] = s.split('-').map(Number); return new Date(y, m - 1, d); };
+  const addDays = (s, n) => { const d = parse(s); d.setDate(d.getDate() + n); return ymd(d); };
+  const diffDays = (a, b) => Math.round((parse(a) - parse(b)) / 864e5);
+  const md = s => { const d = parse(s); return `${d.getMonth() + 1}/${d.getDate()}`; };
+  const ymdJa = s => { const d = parse(s); return `${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()}`; };
+  const ago = n => n === 0 ? '今日' : n === 1 ? '昨日' : n > 1 ? `${n}日前` : `${-n}日後`;
+
+  // データの整形（読み込み時・バックアップ復元時の両方で使う）
+  function clean(list) {
+    if (!Array.isArray(list)) return [];
+    return list.filter(p => p && typeof p.name === 'string' && p.name.trim()).map(p => ({
+      id: typeof p.id === 'string' && p.id ? p.id : uid(),
+      name: p.name.trim().slice(0, 40),
+      interval: Math.min(365, Math.max(1, parseInt(p.interval, 10) || 7)),
+      memo: typeof p.memo === 'string' ? p.memo.slice(0, 200) : '',
+      logs: (Array.isArray(p.logs) ? p.logs : [])
+        .filter(l => l && TYPES[l.type] && DATE_RE.test(l.date))
+        .map(l => ({
+          id: typeof l.id === 'string' && l.id ? l.id : uid(),
+          type: l.type,
+          date: l.date,
+          note: typeof l.note === 'string' ? l.note.slice(0, 100) : ''
+        }))
+    }));
+  }
+
+  let plants = [];
+  try { plants = clean(JSON.parse(localStorage.getItem(KEY) || '[]')); } catch (e) {}
+  function save() {
+    try { localStorage.setItem(KEY, JSON.stringify(plants)); }
+    catch (e) { toast('保存できませんでした（プライベートブラウズ中かもしれません）'); }
+  }
+  const find = id => plants.find(p => p.id === id);
+  const lastOf = (p, type) => p.logs.filter(l => l.type === type).reduce((m, l) => l.date > m ? l.date : m, '');
+  function addLog(p, type, date, note) {
+    const log = { id: uid(), type, date, note: note || '' };
+    p.logs.push(log);
+    save();
+    return log;
+  }
+
+  // ---- 一覧 ----
+  function render() {
+    const t = ymd(new Date());
+    const rows = plants.map(p => {
+      const last = lastOf(p, 'water');
+      const next = last ? addDays(last, p.interval) : t;
+      return { p, last, next, until: diffDays(next, t) };
+    }).sort((a, b) => a.until - b.until || a.p.name.localeCompare(b.p.name, 'ja'));
+
+    $('empty').hidden = plants.length > 0;
+    $('list').innerHTML = rows.map(({ p, last, next, until }) => {
+      const cls = !last ? 'due' : until < 0 ? 'over' : until === 0 ? 'due' : '';
+      const nextTxt = !last ? '' :
+        until < 0 ? `${-until}日 過ぎています` :
+        until === 0 ? '今日が目安です' :
+        until === 1 ? '明日が目安です' : `あと${until}日（${md(next)}）`;
+      const lastTxt = last ? `最後の水やり：${ago(diffDays(t, last))}（${md(last)}）` : 'まだ水やりの記録がありません';
+      const extras = ['soil', 'pot'].map(k => {
+        const d = lastOf(p, k);
+        return d ? `${TYPES[k].label}：${ymdJa(d)}` : '';
+      }).filter(Boolean).join('　');
+      return `<article class="plant ${cls}">
+        <div class="head" data-open="${esc(p.id)}">
+          <div class="name">${esc(p.name)}</div>
+          <div class="interval">${p.interval}日おき ›</div>
+        </div>
+        ${nextTxt ? `<div class="next">${nextTxt}</div>` : ''}
+        <div class="sub">${lastTxt}</div>
+        ${extras ? `<div class="sub">${esc(extras)}</div>` : ''}
+        <button class="water" data-water="${esc(p.id)}">💧 水やりした</button>
+      </article>`;
+    }).join('');
+  }
+
+  // ---- トースト（取り消し付き） ----
+  let toastTimer, undoInfo = null;
+  function toast(msg, undo) {
+    $('toastMsg').textContent = msg;
+    $('undoBtn').hidden = !undo;
+    undoInfo = undo || null;
+    $('toast').classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => $('toast').classList.remove('show'), 4500);
+  }
+  $('undoBtn').addEventListener('click', () => {
+    if (!undoInfo) return;
+    const p = find(undoInfo.pid);
+    if (p) { p.logs = p.logs.filter(l => l.id !== undoInfo.lid); save(); render(); }
+    undoInfo = null;
+    $('toast').classList.remove('show');
+  });
+
+  $('list').addEventListener('click', e => {
+    const w = e.target.closest('[data-water]');
+    if (w) {
+      const p = find(w.dataset.water);
+      if (!p) return;
+      const log = addLog(p, 'water', ymd(new Date()));
+      render();
+      toast(`${p.name} に水をあげました`, { pid: p.id, lid: log.id });
+      return;
+    }
+    const o = e.target.closest('[data-open]');
+    if (o) openDetail(o.dataset.open);
+  });
+
+  // ---- 詳細（履歴・土替え・鉢替え） ----
+  let curId = null;
+  function openDetail(id) { curId = id; renderDetail(); $('detail').showModal(); }
+  function renderDetail() {
+    const p = find(curId);
+    if (!p) return;
+    const logs = [...p.logs].sort((a, b) => b.date.localeCompare(a.date));
+    const opts = Object.entries(TYPES).map(([k, v]) => `<option value="${k}">${v.icon} ${v.label}</option>`).join('');
+    $('detailBody').innerHTML = `
+      <h2>${esc(p.name)}</h2>
+      <label class="f">名前<input id="dName" value="${esc(p.name)}" maxlength="40"></label>
+      <label class="f">水やりの間隔（日）<input id="dInt" type="number" min="1" max="365" inputmode="numeric" value="${p.interval}"></label>
+      <label class="f">メモ（任意）<input id="dMemo" value="${esc(p.memo)}" maxlength="200" placeholder="置き場所など"></label>
+      <h3>記録を追加</h3>
+      <div class="addrow">
+        <select id="lType">${opts}</select>
+        <input id="lDate" type="date" value="${ymd(new Date())}">
+      </div>
+      <input id="lNote" placeholder="ひとことメモ（任意）" maxlength="100">
+      <button class="primary full" id="lAdd">追加</button>
+      <h3>履歴</h3>
+      <ul class="logs">${logs.length ? logs.map(l => `
+        <li><span>${TYPES[l.type].icon} ${TYPES[l.type].label}</span>
+        <span class="d">${ymdJa(l.date)}</span>
+        <span class="n">${esc(l.note)}</span>
+        <button class="x" data-del="${esc(l.id)}" aria-label="削除">×</button></li>`).join('')
+        : '<li class="none">まだ記録がありません</li>'}</ul>
+      <button class="danger full" id="pDel">この植物を削除</button>`;
+  }
+  $('detailBody').addEventListener('change', e => {
+    const p = find(curId);
+    if (!p) return;
+    if (e.target.id === 'dName') {
+      const v = e.target.value.trim();
+      if (v) p.name = v.slice(0, 40); else e.target.value = p.name;
+    } else if (e.target.id === 'dInt') {
+      p.interval = Math.min(365, Math.max(1, parseInt(e.target.value, 10) || p.interval));
+      e.target.value = p.interval;
+    } else if (e.target.id === 'dMemo') {
+      p.memo = e.target.value.slice(0, 200);
+    } else return;
+    save();
+    render();
+    const h = $('detailBody').querySelector('h2');
+    if (h) h.textContent = p.name;
+  });
+  $('detailBody').addEventListener('click', e => {
+    const p = find(curId);
+    if (!p) return;
+    if (e.target.id === 'lAdd') {
+      let date = $('lDate').value;
+      if (!DATE_RE.test(date)) date = ymd(new Date());
+      addLog(p, $('lType').value, date, $('lNote').value.trim());
+      render();
+      renderDetail();
+    } else if (e.target.dataset.del) {
+      p.logs = p.logs.filter(l => l.id !== e.target.dataset.del);
+      save();
+      render();
+      renderDetail();
+    } else if (e.target.id === 'pDel') {
+      if (confirm(`「${p.name}」を削除します。記録も全部消えます。よろしいですか？`)) {
+        plants = plants.filter(x => x.id !== p.id);
+        save();
+        render();
+        $('detail').close();
+      }
+    }
+  });
+  $('detailClose').addEventListener('click', () => $('detail').close());
+
+  // ---- 追加 ----
+  $('addBtn').addEventListener('click', () => { $('addForm').reset(); $('addDlg').showModal(); });
+  $('addClose').addEventListener('click', () => $('addDlg').close());
+  $('addForm').addEventListener('submit', e => {
+    e.preventDefault();
+    const name = $('aName').value.trim();
+    if (!name) return;
+    const p = {
+      id: uid(),
+      name: name.slice(0, 40),
+      interval: Math.min(365, Math.max(1, parseInt($('aInt').value, 10) || 7)),
+      memo: '',
+      logs: []
+    };
+    const last = $('aLast').value;
+    if (DATE_RE.test(last)) p.logs.push({ id: uid(), type: 'water', date: last, note: '' });
+    plants.push(p);
+    save();
+    render();
+    $('addDlg').close();
+  });
+
+  // ---- バックアップ（文字列でコピー／貼り付け復元） ----
+  $('backupBtn').addEventListener('click', () => {
+    $('bkText').value = JSON.stringify({ version: 1, plants });
+    $('bkStatus').textContent = '';
+    $('backupDlg').showModal();
+  });
+  $('backupClose').addEventListener('click', () => $('backupDlg').close());
+  $('bkCopy').addEventListener('click', async () => {
+    const ta = $('bkText');
+    try { await navigator.clipboard.writeText(ta.value); }
+    catch (e) { ta.select(); document.execCommand('copy'); }
+    $('bkStatus').textContent = 'コピーしました';
+  });
+  $('bkLoad').addEventListener('click', () => {
+    let data;
+    try { data = JSON.parse($('bkText').value); }
+    catch (e) { $('bkStatus').textContent = '読み込めませんでした。文字列が途中で切れていないか確認してください。'; return; }
+    const list = clean(Array.isArray(data) ? data : data && data.plants);
+    if (!list.length) { $('bkStatus').textContent = '植物のデータが見つかりませんでした。'; return; }
+    if (!confirm(`${list.length}件の植物で、今のデータを置き換えます。よろしいですか？`)) return;
+    plants = list;
+    save();
+    render();
+    $('bkStatus').textContent = '読み込みました';
+  });
+
+  // 日をまたいで開き直したときに「あと◯日」を更新
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) render(); });
+
+  render();
+})();
+</script>
+</body>
+</html>
